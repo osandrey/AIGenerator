@@ -1,10 +1,12 @@
 from typing import List
 
+import pyttsx3
 from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
+from deep_translator import GoogleTranslator
 
 from src.database.db import get_db
-from src.services.text_utils import create_answer
+from src.services.text_utils import create_answer, create_say_answer
 from src.database.models import User
 from src.schemas import QuestionResponse, QuestionModel, QuestionUpdate
 #from src.schemas import QuestionResponseModel
@@ -12,7 +14,9 @@ from src.services import text_utils as repository_questions
 from src.services.auth import auth_service
 
 
+
 router = APIRouter(prefix='/text', tags=["Ai-generator"])
+
 
 @router.get("/", response_model=List[QuestionResponse])
 async def read_all_requests(skip: int = 0, limit: int = 100, user: User = Depends(auth_service.get_current_user), db: Session = Depends(get_db)):
@@ -24,11 +28,21 @@ async def read_all_requests(skip: int = 0, limit: int = 100, user: User = Depend
 async def generate_answer(question: QuestionModel,
                           user: User = Depends(auth_service.get_current_user),
                           db: Session = Depends(get_db)):
-    response = await create_answer(question.response, user, db)
+    response = await create_answer(question.response,question.language, user, db)
 
     return {"response": response, "question": question.response, "user_id": user.id}
 
 
+@router.post("/say_answer", response_model=QuestionResponse)
+async def generate_answer(question: QuestionModel,
+                          user: User = Depends(auth_service.get_current_user),
+                          db: Session = Depends(get_db)):
+    response = await create_say_answer(question.response,question.language)
+
+    engine = pyttsx3.init()
+    engine.say(response)
+    engine.runAndWait()
+    return {"response": response, "question": question.response, "user_id": user.id}
 
 # @router.post("/", response_model=QuestionResponseModel)
 # async def generate_answer(question: QuestionModel,

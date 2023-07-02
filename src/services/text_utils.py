@@ -2,6 +2,7 @@
 from typing import List, Type
 
 import openai  # for using GPT and getting embeddings
+from deep_translator import GoogleTranslator
 
 from dotenv import dotenv_values
 from sqlalchemy import and_
@@ -25,7 +26,11 @@ async def get_question(question_id: int, user: User, db: Session) -> Type[Questi
     return db.query(Question).filter(and_(Question.id == question_id, Question.user_id == user.id)).first()
 
 
+
+
 async def create_question(body: QuestionResponse, user: User, db: Session):
+    # translate(data, language)
+
     question = QuestionResponse(
         answer=body.response,
         question=body.question,
@@ -56,9 +61,15 @@ async def update_question(contact_id: int, user: User, body: QuestionUpdate, db:
     return question
 
 
-async def create_answer(question: str, user: User, db: Session) -> str|None:
+def translate(data, language):
+    translated = GoogleTranslator(source='auto', target=language).translate(data)
+    return translated
+
+
+async def create_answer(question: str, language: str, user: User, db: Session) -> str|None:
     print(config.get("GTPAPIKEY"))
-    # task = f"Translate into{lang} this{question}"
+    print(language)
+
     try:
         completion = openai.ChatCompletion.create(
             model=GPT_MODEL,
@@ -69,8 +80,9 @@ async def create_answer(question: str, user: User, db: Session) -> str|None:
             temperature=0.8,
         )
         text = completion.choices[0].message.content
+        tranlated_text = translate(text, language)
         question_db = Question(
-            response=text,
+            response=tranlated_text,
             question=question,
             user_id=user.id
         )
@@ -80,9 +92,30 @@ async def create_answer(question: str, user: User, db: Session) -> str|None:
     except ValueError as er:
         print(er)
         text = "ERROR"
-    print(text)
-    return text
+    print(tranlated_text)
+    return tranlated_text
 
+
+
+async def create_say_answer(question: str, language: str) -> str|None:
+    print(config.get("GTPAPIKEY"))
+    print(language)
+    try:
+        completion = openai.ChatCompletion.create(
+            model=GPT_MODEL,
+            messages=[
+                {"role": "system", "content": "You are famous comic!"},
+                {"role": "user", "content": question},
+            ],
+            temperature=0.8,
+        )
+        text = completion.choices[0].message.content
+        tranlated_text = translate(text, language)
+    except ValueError as er:
+        print(er)
+        tranlated_text = "ERROR"
+    print(tranlated_text)
+    return tranlated_text
 
 # if __name__ == '__main__':
 #     asyncio.run(create_answer('Who is Putin?'))
